@@ -1,0 +1,1279 @@
+openapi: 3.0.3
+info:
+  title: Salon Booking API
+  description: |
+    Complete API documentation for the Salon Booking Management System.
+    
+    ## Authentication
+    Most endpoints require a Bearer token in the Authorization header.
+    Get your token by calling `/api/auth/login` or `/api/auth/register`.
+    
+    ## Base URL
+    - Production: `https://appointment-backend-wpie.vercel.app`
+    - Development: `http://localhost:5000`
+    
+    ## Features
+    - User authentication (JWT)
+    - Service management
+    - Appointment booking
+    - Staff approval workflow
+    - Payment processing (Stripe)
+    - Business reports
+    
+  version: 1.0.0
+  contact:
+    name: Hashini - Development Team
+    email: support@salonbooking.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://appointment-backend-wpie.vercel.app
+    description: Production server (Vercel)
+  - url: http://localhost:5000
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: User registration, login, and profile management
+  - name: Services
+    description: Salon service catalog management
+  - name: Staff & Users
+    description: Staff approval and user management
+  - name: Appointments
+    description: Booking and appointment management
+  - name: Payments
+    description: Stripe payment processing
+  - name: Reports
+    description: Business analytics and reports (Admin only)
+
+paths:
+  /:
+    get:
+      summary: Health Check
+      description: Check if the API server is running
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Server is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Salon Booking API is running!
+
+  /api/auth/register:
+    post:
+      summary: Register New User
+      description: Create a new user account (customer, staff, or admin)
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  example: Vinday Sanduni
+                  minLength: 2
+                  maxLength: 100
+                email:
+                  type: string
+                  format: email
+                  example: vidya@gmail.com
+                password:
+                  type: string
+                  format: password
+                  example: 123456
+                  minLength: 6
+                role:
+                  type: string
+                  enum: [customer, staff, admin]
+                  default: customer
+                  example: customer
+                phone:
+                  type: string
+                  example: "0771234567"
+                  pattern: '^[0-9]{10,15}$'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: User registered successfully
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/auth/login:
+    post:
+      summary: User Login
+      description: Authenticate user and receive JWT token
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@gmail.com
+                password:
+                  type: string
+                  format: password
+                  example: 123456
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Login successful
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/auth/me:
+    get:
+      summary: Get Current User Profile
+      description: Get the profile of the currently authenticated user
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/services:
+    get:
+      summary: Get All Services
+      description: Retrieve all active services (public access)
+      tags:
+        - Services
+      responses:
+        '200':
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      summary: Create New Service
+      description: Add a new service to the catalog (Admin only)
+      tags:
+        - Services
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - description
+                - duration
+                - price
+                - category
+              properties:
+                name:
+                  type: string
+                  example: Premium Haircut
+                  minLength: 3
+                  maxLength: 100
+                description:
+                  type: string
+                  example: Professional haircut with wash and blow-dry styling
+                  minLength: 10
+                  maxLength: 500
+                duration:
+                  type: integer
+                  example: 30
+                  minimum: 15
+                  maximum: 480
+                  description: Duration in minutes (must be multiple of 15)
+                price:
+                  type: number
+                  format: float
+                  example: 1500
+                  minimum: 0
+                  maximum: 10000
+                category:
+                  type: string
+                  enum: [Hair, Nails, Facial, Massage, Waxing, Makeup, Other]
+                  example: Hair
+      responses:
+        '201':
+          description: Service created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Service created successfully
+                  service:
+                    $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/services/{id}:
+    get:
+      summary: Get Service by ID
+      description: Retrieve a single service by its ID
+      tags:
+        - Services
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: Service found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    put:
+      summary: Update Service
+      description: Update an existing service (Admin only)
+      tags:
+        - Services
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Premium Haircut & Styling
+                description:
+                  type: string
+                  example: Updated professional haircut service
+                duration:
+                  type: integer
+                  example: 75
+                price:
+                  type: number
+                  format: float
+                  example: 60
+                category:
+                  type: string
+                  example: Hair
+                isActive:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: Service updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Service updated successfully
+                  service:
+                    $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    delete:
+      summary: Delete Service
+      description: Remove a service from the catalog (Admin only)
+      tags:
+        - Services
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: Service deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Service deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/users/staff:
+    get:
+      summary: Get Approved Staff
+      description: Get all approved staff members (public access)
+      tags:
+        - Staff & Users
+      responses:
+        '200':
+          description: List of approved staff
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffMember'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/users/staff/pending:
+    get:
+      summary: Get Pending Staff
+      description: Get all staff members waiting for approval (Admin only)
+      tags:
+        - Staff & Users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of pending staff
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PendingStaff'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/users/staff/all:
+    get:
+      summary: Get All Staff
+      description: Get all staff members (approved and pending) - Admin only
+      tags:
+        - Staff & Users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of all staff
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/users/staff/{id}/approve:
+    put:
+      summary: Approve Staff Member
+      description: Approve a pending staff member and assign specialization (Admin only)
+      tags:
+        - Staff & Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Staff member ID
+          schema:
+            type: string
+            example: 65abc123def456
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - specialization
+              properties:
+                specialization:
+                  type: string
+                  example: Hair Stylist
+                  description: Staff member's area of expertise
+      responses:
+        '200':
+          description: Staff approved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Staff member approved successfully
+                  user:
+                    $ref: '#/components/schemas/StaffMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/users/staff/{id}/reject:
+    put:
+      summary: Reject Staff Member
+      description: Reject a staff member registration (Admin only)
+      tags:
+        - Staff & Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Staff member ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Staff rejected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Staff member rejected and removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/appointments:
+    get:
+      summary: Get Appointments
+      description: |
+        Get appointments based on user role:
+        - Customer: Only their appointments
+        - Staff: Only their assigned appointments
+        - Admin: All appointments
+      tags:
+        - Appointments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [pending, confirmed, completed, cancelled]
+        - name: startDate
+          in: query
+          description: Filter from date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+            example: "2026-01-01"
+        - name: endDate
+          in: query
+          description: Filter to date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+            example: "2026-12-31"
+      responses:
+        '200':
+          description: List of appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Appointment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      summary: Create Appointment
+      description: Book a new appointment
+      tags:
+        - Appointments
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - service
+                - staff
+                - appointmentDate
+                - startTime
+                - endTime
+                - paymentMethod
+              properties:
+                service:
+                  type: string
+                  example: 65abc123def456
+                  description: Service ID
+                staff:
+                  type: string
+                  example: 65xyz789abc012
+                  description: Staff member ID
+                appointmentDate:
+                  type: string
+                  format: date
+                  example: "2026-04-15"
+                startTime:
+                  type: string
+                  pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+                  example: "10:00"
+                endTime:
+                  type: string
+                  pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+                  example: "11:00"
+                paymentMethod:
+                  type: string
+                  enum: [cash, online]
+                  example: cash
+                notes:
+                  type: string
+                  maxLength: 500
+                  example: First time customer
+      responses:
+        '201':
+          description: Appointment created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Appointment created successfully
+                  appointment:
+                    $ref: '#/components/schemas/Appointment'
+        '400':
+          description: Bad request (e.g., time slot already booked)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Service or staff not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/appointments/{id}:
+    put:
+      summary: Update Appointment
+      description: Update appointment status or payment details
+      tags:
+        - Appointments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Appointment ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [confirmed, completed, cancelled]
+                  example: confirmed
+                paymentStatus:
+                  type: string
+                  enum: [paid, pending, failed]
+                  example: paid
+                paidAt:
+                  type: string
+                  format: date-time
+                  example: "2026-04-15T10:30:00Z"
+      responses:
+        '200':
+          description: Appointment updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Appointment updated successfully
+                  appointment:
+                    $ref: '#/components/schemas/Appointment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/payments/create-intent:
+    post:
+      summary: Create Payment Intent
+      description: Create a Stripe PaymentIntent for online payment
+      tags:
+        - Payments
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - appointmentId
+              properties:
+                appointmentId:
+                  type: string
+                  example: 65apt789xyz012
+      responses:
+        '200':
+          description: Payment intent created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clientSecret:
+                    type: string
+                    example: pi_xxx_secret_xxx
+                    description: Client secret for Stripe.js
+                  paymentIntentId:
+                    type: string
+                    example: pi_xxx
+                  amount:
+                    type: number
+                    format: float
+                    example: 50
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Appointment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/payments/confirm:
+    post:
+      summary: Confirm Payment
+      description: Confirm payment after Stripe processes the card
+      tags:
+        - Payments
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - appointmentId
+                - paymentIntentId
+              properties:
+                appointmentId:
+                  type: string
+                  example: 65apt789xyz012
+                paymentIntentId:
+                  type: string
+                  example: pi_xxx
+      responses:
+        '200':
+          description: Payment confirmed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Payment successful!
+                  appointment:
+                    $ref: '#/components/schemas/Appointment'
+        '400':
+          description: Payment not completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/reports/weekly:
+    get:
+      summary: Weekly Report
+      description: Get business report for the last 7 days (Admin only)
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Weekly report data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/reports/monthly:
+    get:
+      summary: Monthly Report
+      description: Get business report for the last 30 days with staff performance (Admin only)
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Monthly report data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Report'
+                  - type: object
+                    properties:
+                      staffPerformance:
+                        type: object
+                        description: Performance metrics per staff member
+                        additionalProperties:
+                          type: object
+                          properties:
+                            count:
+                              type: integer
+                            revenue:
+                              type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/reports/custom:
+    get:
+      summary: Custom Range Report
+      description: Get business report for a custom date range (Admin only)
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          description: Start date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+            example: "2026-01-01"
+        - name: endDate
+          in: query
+          required: true
+          description: End date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+            example: "2026-12-31"
+      responses:
+        '200':
+          description: Custom range report data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from `/api/auth/login` or `/api/auth/register`.
+        
+        Example: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
+  parameters:
+    ServiceId:
+      name: id
+      in: path
+      required: true
+      description: Service ID (MongoDB ObjectId)
+      schema:
+        type: string
+        example: 65abc123def456
+
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 65abc123def456
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        phone:
+          type: string
+          example: "0771234567"
+        role:
+          type: string
+          enum: [customer, staff, admin]
+          example: customer
+        specialization:
+          type: string
+          nullable: true
+          example: Hair Stylist
+        isApproved:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-15T08:30:00Z"
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 65abc123def456
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          example: john@example.com
+        role:
+          type: string
+          example: customer
+        isApproved:
+          type: boolean
+          example: true
+
+    StaffMember:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 65xyz789abc012
+        name:
+          type: string
+          example: Sarah Johnson
+        email:
+          type: string
+          example: sarah@salon.com
+        specialization:
+          type: string
+          example: Hair Stylist
+        availability:
+          type: array
+          items:
+            type: string
+          example: ["Monday 9-17", "Tuesday 9-17"]
+
+    PendingStaff:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 65staff456
+        name:
+          type: string
+          example: New Staff
+        email:
+          type: string
+          example: newstaff@salon.com
+        phone:
+          type: string
+          example: "0771234567"
+        specialization:
+          type: string
+          nullable: true
+          example: null
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-02-17T05:44:33Z"
+
+    Service:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 65svc123abc456
+        name:
+          type: string
+          example: Premium Haircut
+        description:
+          type: string
+          example: Professional haircut with wash and blow-dry styling
+        duration:
+          type: integer
+          example: 60
+          description: Duration in minutes
+        price:
+          type: number
+          format: float
+          example: 50
+        category:
+          type: string
+          example: Hair
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-10T09:00:00Z"
+
+    Appointment:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 65apt789xyz012
+        customer:
+          type: object
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+            phone:
+              type: string
+        staff:
+          type: object
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
+            specialization:
+              type: string
+        service:
+          type: object
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
+            price:
+              type: number
+            duration:
+              type: integer
+        appointmentDate:
+          type: string
+          format: date
+          example: "2026-04-15"
+        startTime:
+          type: string
+          example: "10:00"
+        endTime:
+          type: string
+          example: "11:00"
+        status:
+          type: string
+          enum: [pending, confirmed, completed, cancelled]
+          example: pending
+        paymentMethod:
+          type: string
+          enum: [cash, online]
+          example: cash
+        paymentStatus:
+          type: string
+          enum: [pending, paid, failed, refunded]
+          example: pending
+        amount:
+          type: number
+          format: float
+          example: 50
+        paymentId:
+          type: string
+          nullable: true
+          example: pi_abc123xyz789
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-04-15T10:30:00Z"
+        notes:
+          type: string
+          example: First time customer
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-04-10T14:25:00Z"
+
+    Report:
+      type: object
+      properties:
+        period:
+          type: string
+          example: Weekly
+        startDate:
+          type: string
+          format: date
+          example: "2026-02-03"
+        endDate:
+          type: string
+          format: date
+          example: "2026-02-10"
+        summary:
+          type: object
+          properties:
+            totalAppointments:
+              type: integer
+              example: 45
+            completedAppointments:
+              type: integer
+              example: 38
+            cancelledAppointments:
+              type: integer
+              example: 2
+            totalRevenue:
+              type: number
+              format: float
+              example: 1900
+            pendingPayments:
+              type: number
+              format: float
+              example: 350
+            cashPayments:
+              type: integer
+              example: 25
+            onlinePayments:
+              type: integer
+              example: 13
+        serviceBreakdown:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              count:
+                type: integer
+              revenue:
+                type: number
+          example:
+            Haircut:
+              count: 20
+              revenue: 1000
+            Manicure:
+              count: 15
+              revenue: 600
+        appointments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Appointment'
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Error description
+
+  responses:
+    BadRequest:
+      description: Bad request (validation error)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Validation failed
+
+    Unauthorized:
+      description: Unauthorized (missing or invalid token)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: No token, authorization denied
+
+    Forbidden:
+      description: Forbidden (insufficient permissions)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Access denied. Admin only.
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Resource not found
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: Server error
