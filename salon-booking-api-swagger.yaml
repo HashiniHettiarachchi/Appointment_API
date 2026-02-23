@@ -965,11 +965,11 @@ components:
           example: 65abc123def456
         name:
           type: string
-          example: John Doe
+          example: Pawan Nadun
         email:
           type: string
           format: email
-          example: john@example.com
+          example: Pawan@example.com
         phone:
           type: string
           example: "0771234567"
@@ -997,10 +997,10 @@ components:
           example: 65abc123def456
         name:
           type: string
-          example: John Doe
+          example: Mishara Denuwan
         email:
           type: string
-          example: john@example.com
+          example: mishar@example.com
         role:
           type: string
           example: customer
@@ -1016,10 +1016,10 @@ components:
           example: 65xyz789abc012
         name:
           type: string
-          example: Sarah Johnson
+          example: Sara Senuli
         email:
           type: string
-          example: sarah@salon.com
+          example: sara@salon.com
         specialization:
           type: string
           example: Hair Stylist
